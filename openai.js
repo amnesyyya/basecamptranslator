@@ -6,19 +6,22 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
-async function runCompletion() {
+async function translateMessage(text) {
     try {
         const completion = await openai.createChatCompletion({
             model: "gpt-4",
             messages: [
                 { role: "system", content: "You are a helpful assistant that translates Italian to English." },
-                { role: "user", content: 'Translate the following Italian text to English: "{edoardo sei bello}"' }
-            ]
+                { role: "user", content: `Translate the following Italian text to English: "${text}"` },
+            ],
         });
-        console.log(completion.data.choices[0].message);
+        return completion.data.choices[0].message;
     } catch (error) {
         console.log(error);
     }
 }
-runCompletion();
+
+module.exports = {
+    translateMessage,
+};
 
