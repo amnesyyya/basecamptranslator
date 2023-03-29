@@ -6,16 +6,13 @@ const passport = require('passport');
 const BasecampStrategy = require('passport-basecamp').Strategy;
 const axios = require('axios');
 
-app.use(express.json());
-app.post('/basecamp/webhook', (req, res) => {
-    console.log(req);
-    res.status(200).end();
-});
 
-//oAuth2 setup
+
+// Setup
 app.use(session({ secret: 'your_session_secret', resave: false, saveUninitialized: false }));
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(express.json());
 
 // Credentials
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -64,6 +61,11 @@ app.get('/auth/basecamp/callback', passport.authenticate('basecamp', { failureRe
     }
 );
 
+app.post('/basecamp/webhook', (req, res) => {
+    console.log(req.body);
+    res.status(200).end();
+});
+
 app.use((req, res, next) => {
     if (req.isAuthenticated()) {
         req.accessToken = req.user.accessToken;
@@ -92,33 +94,33 @@ app.get('/', async (req, res) => {
 
 
 
-// // Fetch all the data from the API
+// Fetch all the data from the API
 
-// const personalProjectId = 26874141
-// const personalCampfire = 4772535975
+const personalProjectId = 26874141
+const personalCampfire = 4772535975
 
-// async function fetchAllData(accessToken, accountId, page = 1, allData = []) {
-//     try {
-//         const response = await axios.get(`https://3.basecampapi.com/${accountId}/buckets/${personalProjectId}/chats/${personalCampfire}/lines.json?page=${page}`, {
-//             headers: {
-//                 'Authorization': 'Bearer ' + accessToken,
-//                 'User-Agent': 'ChatGpt Translator (lorenzo.tlili@redergo.com)',
-//             },
-//         });
+async function fetchAllData(accessToken, accountId, page = 1, allData = []) {
+    try {
+        const response = await axios.get(`https://3.basecampapi.com/${accountId}/buckets/${personalProjectId}/chats/${personalCampfire}/lines.json?page=${page}`, {
+            headers: {
+                'Authorization': 'Bearer ' + accessToken,
+                'User-Agent': 'ChatGpt Translator (lorenzo.tlili@redergo.com)',
+            },
+        });
 
-//         if (response.data.length === 0) {
-//             // Extract only the content of the messages
-//             const contents = allData.map(line => line.content);
-//             return contents;
-//         }
+        if (response.data.length === 0) {
+            // Extract only the content of the messages
+            const contents = allData.map(line => line.content);
+            return contents;
+        }
 
-//         allData = allData.concat(response.data);
-//         return fetchAllData(accessToken, accountId, page + 1, allData);
-//     } catch (error) {
-//         console.error(error);
-//         throw new Error('Errore nel recupero dei dati');
-//     }
-// }
+        allData = allData.concat(response.data);
+        return fetchAllData(accessToken, accountId, page + 1, allData);
+    } catch (error) {
+        console.error(error);
+        throw new Error('Errore nel recupero dei dati');
+    }
+}
 
 
 // Server setup
