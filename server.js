@@ -5,10 +5,15 @@ const session = require('express-session');
 const passport = require('passport');
 const BasecampStrategy = require('passport-basecamp').Strategy;
 const axios = require('axios');
+const { Configuration, OpenAIApi } = require("openai");
 
+// Openai setup
+const configuration = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(configuration);
 
-
-// Setup
+// Express - Parsing Setup
 app.use(session({ secret: 'your_session_secret', resave: false, saveUninitialized: false }));
 app.use(passport.initialize());
 app.use(passport.session());
@@ -18,6 +23,8 @@ app.use(express.json());
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const CALLBACK_URL = process.env.CALLBACK_URL;
+const personalProjectId = 26874141;
+const personalCampfire = 4772535975;
 
 // Passport setup
 passport.use(new BasecampStrategy({
@@ -61,10 +68,68 @@ app.get('/auth/basecamp/callback', passport.authenticate('basecamp', { failureRe
     }
 );
 
-app.post('/basecamp/webhook', (req, res) => {
-    console.log(req.body);
+// Webhook post
+app.post('/basecamp/webhook', async (req, res) => { 
+    console.log(req.body.command);
+    res.status(200).end();
+
+    // Translate the message using GPT-4
+    if (req.body && req.body.command) {
+        const textBeforeTranslation = req.body.command;
+
+        
+        async function translateMessage(textBeforeTranslation) {
+            try {
+                const completion = await openai.createChatCompletion({
+                    model: "gpt-4",
+                    messages: [
+                        { role: "system", content: "You are a helpful assistant that translates Italian to English." },
+                        { role: "user", content: `Translate the following Italian text to English: "${textBeforeTranslation}"` },
+                    ],
+                });
+                return completion.data.choices[0].message;
+            } catch (error) {
+                console.log(error);
+            }
+        }
+        // Output the translated message
+        const translatedMessage = await translateMessage(textBeforeTranslation); 
+        console.log("Messaggio tradotto in inglese:", translatedMessage.content);
+
+        // Send the translated message to the Campfire
+        async function postMessageToCampfire(translatedMessage, accountId, accessToken) {
+            console.log('Translated message:', translatedMessage);
+        console.log('Account ID:', accountId);
+        console.log('Access Token:', accessToken);
+            try {
+                await axios.post(
+                    `https://3.basecampapi.com/${accountId}/buckets/${personalProjectId}/chats/${personalCampfire}/lines.json`,
+                    { content: translatedMessage.content },
+                    {
+                        headers: {
+                            'Authorization': 'Bearer ' + accessToken,
+                            'Content-Type': 'application/json',
+                        },
+                    }
+                );
+            } catch (error) {
+                console.error('Errore nell\'inviare il messaggio al Campfire:', error);
+            }
+
+            await postMessageToCampfire(translatedMessage, req.accountId, req.accessToken);
+
+
+        }
+
+        
+            
+    }
+
     res.status(200).end();
 });
+
+
+
 
 app.use((req, res, next) => {
     if (req.isAuthenticated()) {
@@ -95,10 +160,6 @@ app.get('/', async (req, res) => {
 
 
 // Fetch all the data from the API
-
-const personalProjectId = 26874141
-const personalCampfire = 4772535975
-
 async function fetchAllData(accessToken, accountId, page = 1, allData = []) {
     try {
         const response = await axios.get(`https://3.basecampapi.com/${accountId}/buckets/${personalProjectId}/chats/${personalCampfire}/lines.json?page=${page}`, {
