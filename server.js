@@ -7,7 +7,7 @@ const BasecampStrategy = require('passport-basecamp').Strategy;
 const axios = require('axios');
 
 app.use(express.json());
-app.get('/basecamp/webhook', (req, res) => {
+app.post('/basecamp/webhook', (req, res) => {
     console.log(req);
     res.status(200).end();
 });
