@@ -13,9 +13,9 @@ const openai = new OpenAIApi(configuration);
 async function translateMessage(text) {
     try {
         const completion = await openai.createChatCompletion({
-            model: "gpt-3.5-turbo",
+            model: "gpt-4",
             messages: [
-                { role: "system", content: "You are a helpful assistant that translates Italian to English." },
+                { role: "system", content: "You are a helpful assistant that translates Italian to English. The output needs to be only the translated sentence." },
                 { role: "user", content: `${text}` },
             ],
         });

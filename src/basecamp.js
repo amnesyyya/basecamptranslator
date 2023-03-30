@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const app = express();
 const axios = require('axios');
-const { translateMessage } = require('./openai');
+const { translateMessage } = require('./translator');
 
 // Parsing Setup
 app.use(express.json());
