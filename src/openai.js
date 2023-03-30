@@ -6,6 +6,8 @@ const configuration = new Configuration({
 });
 const openai = new OpenAIApi(configuration);
 
+
+
 async function translateMessage(text) {
     try {
         const completion = await openai.createChatCompletion({
