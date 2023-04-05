@@ -1,44 +1,93 @@
 require('dotenv').config();
 const express = require('express');
 const app = express();
+const session = require('express-session');
+const passport = require('passport');
+const BasecampStrategy = require('passport-basecamp').Strategy;
 const axios = require('axios');
-const { translateMessage } = require('./openai');
+const { fetchAllData } = require('./api_fetching');
 
-// Parsing Setup
-app.use(express.json());
+const culo = 'singh';
 
-// Webhook Personal
-app.post('/basecamp/webhook', async (req, res) => {
-    console.log('Messaggio da tradurre:', req.body.command);
-    res.status(200).end();
+// Express e Passport Setup
+app.use(session({ secret: 'your_session_secret', resave: false, saveUninitialized: false }));
+app.use(passport.initialize());
+app.use(passport.session());
 
+// Credentials
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const CALLBACK_URL = process.env.CALLBACK_URL;
 
-    // Translate the message using GPT-4
-    if (req.body && req.body.command) {
-        const textBeforeTranslation = req.body.command;
-
-        // Output the translated message
-        const translatedMessage = await translateMessage(textBeforeTranslation);
-        console.log("Messaggio tradotto:", translatedMessage.content);
-
-        // Send the translated message to the Campfire
+// Passport strategy
+passport.use(new BasecampStrategy({
+    clientID: CLIENT_ID,
+    clientSecret: CLIENT_SECRET,
+    callbackURL: CALLBACK_URL,
+},
+    async function (accessToken, refreshToken, profile, done) {
         try {
-            await axios.post(
-                `${req.body.callback_url}`,
-                { content: translatedMessage.content },
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
+            const response = await axios.get('https://launchpad.37signals.com/authorization.json', {
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'User-Agent': 'ChatGpt Translator (lorenzo.tlili@redergo.com)',
+                },
+            });
+
+            const accountId = response.data.accounts[0].id;
+            done(null, { accessToken: accessToken, accountId: accountId, profile: profile });
+            globalAccessToken = accessToken;
         } catch (error) {
-            console.error('Errore nell\'inviare il messaggio al Campfire:', error);
+            console.error(error);
+            done(error);
         }
 
     }
+));
 
-    res.status(200).end();
+
+// Autentication
+passport.serializeUser((user, done) => {
+    done(null, user);
+});
+
+passport.deserializeUser((user, done) => {
+    done(null, user);
+});
+
+app.get('/auth/basecamp', passport.authenticate('basecamp'));
+
+app.get('/auth/basecamp/callback', passport.authenticate('basecamp', { failureRedirect: '/login' }),
+    function (req, res) {
+        // User authenticated
+        res.redirect('/');
+    }
+);
+
+// Middleware
+app.use((req, res, next) => {
+    if (req.isAuthenticated()) {
+        req.accessToken = req.user.accessToken;
+        req.accountId = req.user.accountId;
+    }
+    next();
+});
+
+
+// Routes
+app.get('/', async (req, res) => {
+    // Check if the user is authenticated
+    if (req.isAuthenticated()) {
+        try {
+            const allData = await fetchAllData(req.accessToken, req.accountId);
+            res.send(`<pre>${JSON.stringify(allData, null, 2)}</pre>`);
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Errore nel recupero dei dati');
+        }
+    } else {
+        res.send('Per favore, autenticati con <a href="/auth/basecamp">Basecamp</a>');
+    }
 });
 
 // Server setup
