@@ -7,8 +7,6 @@ const BasecampStrategy = require('passport-basecamp').Strategy;
 const axios = require('axios');
 const { fetchAllData } = require('./api_fetching');
 
-const culo = 'singh';
-
 // Express e Passport Setup
 app.use(session({ secret: 'your_session_secret', resave: false, saveUninitialized: false }));
 app.use(passport.initialize());
